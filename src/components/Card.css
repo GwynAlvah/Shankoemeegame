@@ -1,0 +1,115 @@
+:root {
+  --card-width: 130px;
+  --card-height: 190px;
+  --card-radius: 14px;
+  --card-bg: #ffffff;
+  --card-back-bg: #222;
+  --red-suit: #e11d48;
+  --black-suit: #111;
+}
+
+.card {
+  width: var(--card-width);
+  height: var(--card-height);
+  border-radius: var(--card-radius);
+  position: relative;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  background: var(--card-bg);
+  font-family: 'Inter', system-ui, sans-serif;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden; /* Prevent overflow */
+}
+
+.card-face {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 6px;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.card.red {
+  color: var(--red-suit);
+}
+
+.card.black {
+  color: var(--black-suit);
+}
+
+.card-top-left, .card-bottom-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* Align to side */
+  line-height: 1.1;
+  width: 100%;
+}
+
+.card-bottom-right {
+  transform: rotate(180deg);
+}
+
+.card-rank {
+  font-size: 28px;
+  font-weight: 800;
+  margin-left: 2px;
+}
+
+.card-suit {
+  font-size: 24px;
+  margin-left: 2px;
+}
+
+.card-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-grow: 1;
+}
+
+.card-suit-large {
+  font-size: 64px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.card-back {
+  background: var(--card-back-bg);
+  border: 3px solid white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.card-pattern {
+  width: calc(100% - 10px);
+  height: calc(100% - 10px);
+  background-image: 
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1) 5%, transparent 10%),
+    linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.05) 75%, transparent 75%, transparent);
+  background-size: 12px 12px;
+  border-radius: calc(var(--card-radius) - 4px);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+
+/* Animations */
+@keyframes dealIn {
+  0% {
+    transform: translate(-300px, -300px) rotate(-180deg) scale(0.5);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(0, 0) rotate(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.card-deal {
+  animation: dealIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  z-index: 10;
+}
