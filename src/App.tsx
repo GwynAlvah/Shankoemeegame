@@ -14,8 +14,17 @@ interface RoomPlayer { id: string; name: string; isReady: boolean; }
 interface Room { id: string; name: string; players: RoomPlayer[]; status: 'waiting' | 'playing'; fee: number; hostId: string; }
 
 // --- API Helpers ---
-const API_URL = 'import.meta.env.VITE_API_URL';
-const fetchAccounts = async (): Promise<Account[]> => (await fetch(`${API_URL}/accounts`)).json();
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const fetchAccounts = async (): Promise<Account[]> => {
+    try {
+        const resp = await fetch(`${API_URL}/accounts`);
+        if (!resp.ok) return [];
+        return resp.json();
+    } catch (e) {
+        console.error("Fetch accounts failed", e);
+        return [];
+    }
+};
 const createAccount = async (account: Account) => (await fetch(`${API_URL}/accounts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(account) })).json();
 const updateAccount = async (username: string, updates: Partial<Account>) => (await fetch(`${API_URL}/accounts/${encodeURIComponent(username)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) })).json();
 const fetchRooms = async (): Promise<Room[]> => (await fetch(`${API_URL}/rooms`)).json();
