@@ -519,24 +519,69 @@ body {
 
 @media (max-width: 768px) {
     :root {
-        --card-width: 80px;
-        --card-height: 115px;
+        --card-width: 65px;
+        --card-height: 95px;
     }
 
-    .player-seat { 
-        min-width: 150px; 
-        padding: 12px; 
-        gap: 5px;
+    .game-container { padding: 10px; height: 100vh; overflow: hidden; }
+    
+    .hud { 
+        flex-direction: row; 
+        justify-content: space-between; 
+        margin-bottom: 10px; 
+        padding: 0 5px; 
+    }
+    .brand { display: none; } /* Hide brand to save vertical space */
+    .stats-row { border-radius: 12px; }
+    .stat-box { min-width: 70px; padding: 5px 10px; }
+    .stat-label { font-size: 0.45rem; }
+    .stat-value { font-size: 0.85rem; }
+
+    .game-message { font-size: 0.8rem; height: 1.2rem; margin: 5px 0; }
+
+    .players-grid { 
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 10px;
+        max-height: calc(100vh - 120px);
+        overflow-y: auto;
     }
     
-    .hand-display { 
-        min-height: 120px; 
-        gap: 4px; 
+    .player-seat { 
+        min-width: 0;
+        width: 100%;
+        padding: 8px;
+        border-radius: 12px;
+    }
+    
+    .player-seat.is-local { 
+        grid-column: span 2; /* Local player takes full width at bottom */
+        order: 10;
     }
 
-    .player-name { font-size: 0.65rem; }
-    .balance-amount { font-size: 0.9rem; }
-    .points-badge { font-size: 0.6rem; padding: 4px 10px; }
+    .hand-display { 
+        min-height: 100px; 
+        gap: 2px; 
+        margin-bottom: 5px;
+    }
+
+    .player-name { font-size: 0.6rem; margin-bottom: 4px; }
+    .balance-chip { padding: 3px 10px; margin-bottom: 5px; }
+    .balance-amount { font-size: 0.75rem; }
+    
+    .player-score-container { margin: 0 0 5px 0; }
+    .points-badge { font-size: 0.55rem; padding: 2px 8px; }
+    .wager-info { padding: 5px 15px; margin-top: 5px; }
+    .wager-amount { font-size: 0.8rem; }
+
+    /* Fix betting modal for small screens */
+    .betting-modal { padding: 15px; border-radius: 20px; width: 95%; }
+    .total-value { font-size: 1.5rem; }
+    .chip-selection { margin-bottom: 20px; gap: 8px; }
+    .chip { width: 45px; height: 45px; border-width: 3px; }
+    .chip-inner { font-size: 0.65rem; }
+    .btn-confirm-bet, .btn-clear { height: 50px; font-size: 0.8rem; }
 }
 
 @media (max-width: 480px) {
