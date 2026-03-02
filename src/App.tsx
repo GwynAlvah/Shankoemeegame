@@ -14,7 +14,7 @@ interface RoomPlayer { id: string; name: string; isReady: boolean; }
 interface Room { id: string; name: string; players: RoomPlayer[]; status: 'waiting' | 'playing'; fee: number; hostId: string; }
 
 // --- API Helpers ---
-const API_URL = 'http://localhost:3001/api';
+const API_URL = 'import.meta.env.VITE_API_URL';
 const fetchAccounts = async (): Promise<Account[]> => (await fetch(`${API_URL}/accounts`)).json();
 const createAccount = async (account: Account) => (await fetch(`${API_URL}/accounts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(account) })).json();
 const updateAccount = async (username: string, updates: Partial<Account>) => (await fetch(`${API_URL}/accounts/${encodeURIComponent(username)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) })).json();
