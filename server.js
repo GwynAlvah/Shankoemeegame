@@ -325,7 +325,9 @@ app.post('/api/rooms/:name/bet', async (req, res) => {
             } else {
                 game.phase = 'DECISION';
                 game.activePlayerIndex = game.players.findIndex(pl => pl.id !== game.houseId);
-                game.message = `${game.players[game.activePlayerIndex].name} ဆုံးဖြတ်နေသည်...`;
+                const activePlayer = game.players[game.activePlayerIndex];
+                game.message = `${activePlayer.name} ဆုံးဖြတ်နေသည်...`;
+                game.decisionTimer = 15;
             }
         }
     }
@@ -347,9 +349,11 @@ app.post('/api/rooms/:name/decision', (req, res) => {
             while (game.players[next].id === game.houseId || game.players[next].hasStayed) { next = (next + 1) % game.players.length; }
             game.activePlayerIndex = next;
             game.message = `${game.players[next].name} ဆုံးဖြတ်နေသည်...`;
+            game.decisionTimer = 15;
         } else if (p.id !== game.houseId) {
             game.activePlayerIndex = game.players.findIndex(pl => pl.id === game.houseId);
             game.message = `${game.players[game.activePlayerIndex].name} (ဒိုင်) ဆုံးဖြတ်နေသည်...`;
+            game.decisionTimer = 15;
         } else {
             game.phase = 'SHOWDOWN'; game.message = "ကတ်များအားလုံး ဖွင့်ကြည့်မည်...";
             setTimeout(() => resolveRound(game), 3000);
@@ -386,7 +390,9 @@ setInterval(() => {
                     } else {
                         game.phase = 'DECISION';
                         game.activePlayerIndex = game.players.findIndex(pl => pl.id !== game.houseId);
-                        game.message = `${game.players[game.activePlayerIndex].name} ဆုံးဖြတ်နေသည်...`;
+                        const activePlayer = game.players[game.activePlayerIndex];
+                        game.message = `${activePlayer.name} ဆုံးဖြတ်နေသည်...`;
+                        game.decisionTimer = 15;
                     }
                 }, 2000);
             }
