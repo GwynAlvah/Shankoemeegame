@@ -519,47 +519,24 @@ body {
 
 @media (max-width: 768px) {
     :root {
-        --card-width: 90px;
-        --card-height: 130px;
+        --card-width: 80px;
+        --card-height: 115px;
     }
 
-    .login-card { padding: 30px; border-radius: 24px; margin: 20px; }
-    .login-title { font-size: 2.5rem; }
-    .login-tagline { font-size: 0.6rem; letter-spacing: 5px; }
+    .player-seat { 
+        min-width: 150px; 
+        padding: 12px; 
+        gap: 5px;
+    }
     
-    .lobby-hero h1 { font-size: 2.5rem; }
-    .lobby-profile-section { top: 10px; right: 10px; padding: 5px 12px; }
-    .profile-info { display: none; } /* Hide text on mobile to save space */
+    .hand-display { 
+        min-height: 120px; 
+        gap: 4px; 
+    }
 
-    .hud { flex-direction: column; gap: 15px; margin-bottom: 20px; }
-    .brand { position: static; text-align: center; margin-bottom: 10px; }
-    .stat-box { min-width: 100px; padding: 10px 15px; }
-    .stat-value { font-size: 1.1rem; }
-
-    .players-grid { gap: 10px; padding: 0 10px; }
-    .player-seat { min-width: 160px; padding: 15px; border-radius: 16px; }
-    .player-seat.is-local { min-width: 180px; }
-    .hand-display { min-height: 135px; gap: 5px; }
-    
-    .waiting-players-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .waiting-avatar { width: 45px; height: 45px; font-size: 1.2rem; }
-    .modal-actions { flex-direction: column; padding: 0 20px; }
-    .btn-lobby.pulse-gold { min-width: 100%; }
-    .btn-add-ai { min-width: 100%; }
-
-    .betting-modal { padding: 20px; border-radius: 24px; }
-    .total-value { font-size: 2rem; }
-    .chip { width: 55px; height: 55px; }
-    
-    .dealer-name-v2 { font-size: 2.5rem; }
-    .winner-name-v2 { font-size: 2.8rem; }
-    .winner-win-amount { font-size: 2.2rem; }
-    .loser-name-v2 { font-size: 2.5rem; }
-    
-    .rules-grid { grid-template-columns: 1fr; gap: 20px; }
-    .rules-modal { padding: 30px 20px; }
-    
-    .btn-exit { top: 10px; left: 10px; padding: 8px 15px; font-size: 0.6rem; }
+    .player-name { font-size: 0.65rem; }
+    .balance-amount { font-size: 0.9rem; }
+    .points-badge { font-size: 0.6rem; padding: 4px 10px; }
 }
 
 @media (max-width: 480px) {
