@@ -11,41 +11,58 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // --- Database Connection (PostgreSQL for Supabase) ---
+// Note: Render's Free Tier doesn't support IPv6.
+// To fix this, we'll ensure we use the Session/Transaction mode pooler address from Supabase.
 const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/postgres';
+
 const pool = new Pool({
   connectionString: DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // Required for Supabase
+  ssl: {
+    rejectUnauthorized: false
+  },
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 });
 
 pool.connect()
   .then(() => console.log('Connected to Supabase (PostgreSQL)'))
-  .catch(err => console.error('Supabase connection error:', err));
+  .catch(err => {
+    console.error('Supabase connection error:', err);
+    // If connection fails, we don't want to crash the whole server, 
+    // but we should log clearly why it failed.
+  });
 
 // --- Database Initialization (Create Tables) ---
 const initDb = async () => {
     try {
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS accounts (
-                id SERIAL PRIMARY KEY,
-                username TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL,
-                balance INTEGER DEFAULT 0,
-                role TEXT CHECK (role IN ('user', 'admin')) DEFAULT 'user'
-            );
-        `);
-        
-        const res = await pool.query('SELECT COUNT(*) FROM accounts');
-        if (parseInt(res.rows[0].count) === 0) {
-            await pool.query(`
-                INSERT INTO accounts (username, password, balance, role) VALUES
-                ('admin', 'admin123', 0, 'admin'),
-                ('Dragon', 'password123', 50000, 'user'),
-                ('Lucky', 'password123', 15000, 'user');
+        const client = await pool.connect();
+        try {
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS accounts (
+                    id SERIAL PRIMARY KEY,
+                    username TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL,
+                    balance INTEGER DEFAULT 0,
+                    role TEXT CHECK (role IN ('user', 'admin')) DEFAULT 'user'
+                );
             `);
-            console.log('Seeded default accounts');
+            
+            const res = await client.query('SELECT COUNT(*) FROM accounts');
+            if (parseInt(res.rows[0].count) === 0) {
+                await client.query(`
+                    INSERT INTO accounts (username, password, balance, role) VALUES
+                    ('admin', 'admin123', 0, 'admin'),
+                    ('Dragon', 'password123', 50000, 'user'),
+                    ('Lucky', 'password123', 15000, 'user');
+                `);
+                console.log('Seeded default accounts');
+            }
+        } finally {
+            client.release();
         }
     } catch (e) {
-        console.error("Database init failed", e);
+        console.error("Database init failed:", e.message);
     }
 };
 initDb();
@@ -122,7 +139,9 @@ const resolveRound = async (game) => {
             p.lastWin = -totalGain;
             houseNetWin += totalGain;
         }
-        await pool.query('UPDATE accounts SET balance = $1 WHERE username = $2', [p.balance, p.id]);
+        try {
+            await pool.query('UPDATE accounts SET balance = $1 WHERE username = $2', [p.balance, p.id]);
+        } catch (e) { console.error("Balance update failed for", p.id, e.message); }
     }
     house.lastWin = houseNetWin;
     game.message = "ရလဒ်များ ထွက်ပေါ်လာပါပြီ!";
@@ -136,7 +155,9 @@ const nextRound = async (game) => {
         const house = game.players.find(p => p.id === game.houseId);
         const netPot = game.pot - Math.floor(game.pot * 0.05);
         house.balance += netPot;
-        await pool.query('UPDATE accounts SET balance = $1 WHERE username = $2', [house.balance, house.id]);
+        try {
+            await pool.query('UPDATE accounts SET balance = $1 WHERE username = $2', [house.balance, house.id]);
+        } catch (e) { console.error("House balance update failed", e.message); }
         game.pot = 0;
         rotateHouse(game, "၅ ပွဲ ပြည့်သွားပါပြီ! ဒိုင်မှ လက်ကျန်ငွေ အားလုံး သိမ်းယူသည် (၅% ဝန်ဆောင်ခ နှုတ်ပြီး)။");
     } else {
@@ -167,7 +188,9 @@ const rotateHouse = async (game, msg) => {
     for (const p of game.players) {
         if (p.id === game.houseId) {
             p.balance -= game.fee;
-            await pool.query('UPDATE accounts SET balance = $1 WHERE username = $2', [p.balance, p.id]);
+            try {
+                await pool.query('UPDATE accounts SET balance = $1 WHERE username = $2', [p.balance, p.id]);
+            } catch (e) { console.error("Rotate house balance update failed", e.message); }
         }
         p.hand = []; p.currentBet = 0; p.hasStayed = false; p.lastWin = undefined;
         if (p.id.startsWith('AI-')) {
@@ -178,20 +201,29 @@ const rotateHouse = async (game, msg) => {
 };
 
 // --- Account API ---
-app.get('/api/accounts', async (req, res) => { const result = await pool.query('SELECT * FROM accounts'); res.json(result.rows); });
+app.get('/api/accounts', async (req, res) => { 
+    try {
+        const result = await pool.query('SELECT * FROM accounts'); 
+        res.json(result.rows); 
+    } catch (e) { res.status(500).json({message: "Fetch accounts failed"}); }
+});
+
 app.post('/api/accounts', async (req, res) => {
     const { username, password, balance, role } = req.body;
     try {
         const result = await pool.query('INSERT INTO accounts (username, password, balance, role) VALUES ($1, $2, $3, $4) RETURNING *', [username, password, balance, role]);
         res.json(result.rows[0]);
-    } catch (e) { res.status(400).json({message:'Account exists'}); }
+    } catch (e) { res.status(400).json({message:'Account exists or DB error'}); }
 });
+
 app.put('/api/accounts/:username', async (req, res) => {
     const { username } = req.params;
     const { balance, password } = req.body;
-    let query = 'UPDATE accounts SET balance = COALESCE($1, balance), password = COALESCE($2, password) WHERE username = $3 RETURNING *';
-    const result = await pool.query(query, [balance, password, username]);
-    res.json(result.rows[0]);
+    try {
+        let query = 'UPDATE accounts SET balance = COALESCE($1, balance), password = COALESCE($2, password) WHERE username = $3 RETURNING *';
+        const result = await pool.query(query, [balance, password, username]);
+        res.json(result.rows[0]);
+    } catch (e) { res.status(500).json({message: "Update failed"}); }
 });
 
 // --- Rooms API ---
@@ -206,10 +238,12 @@ app.post('/api/rooms/:name/join', async (req, res) => {
     const roomName = decodeURIComponent(req.params.name);
     const room = rooms.find(r => r.name === roomName);
     if (!room || room.status === 'playing' || room.players.length >= 5) return res.status(400).json({message: 'Join failed'});
-    const playerAcc = await pool.query('SELECT * FROM accounts WHERE username = $1', [req.body.player.id]);
-    if (playerAcc.rows[0] && playerAcc.rows[0].balance < room.fee) return res.status(400).json({message: `Insufficient balance.`});
-    if (!room.players.some(p => p.id === req.body.player.id)) room.players.push(req.body.player);
-    res.json(room);
+    try {
+        const playerAcc = await pool.query('SELECT * FROM accounts WHERE username = $1', [req.body.player.id]);
+        if (playerAcc.rows[0] && playerAcc.rows[0].balance < room.fee) return res.status(400).json({message: `Insufficient balance.`});
+        if (!room.players.some(p => p.id === req.body.player.id)) room.players.push(req.body.player);
+        res.json(room);
+    } catch (e) { res.status(500).json({message: "Join error"}); }
 });
 app.post('/api/rooms/:name/bot', (req, res) => {
     const roomName = decodeURIComponent(req.params.name);
@@ -237,27 +271,29 @@ app.post('/api/rooms/:name/start', async (req, res) => {
     const room = rooms.find(r => r.name === roomName);
     if (!room || room.players.length < 2) return res.status(400).json({message:'Needs 2+ players'});
     room.status = 'playing';
-    const players = await Promise.all(room.players.map(async (p) => {
-        const acc = await pool.query('SELECT * FROM accounts WHERE username = $1', [p.id]);
-        return { ...p, balance: acc.rows[0] ? acc.rows[0].balance : 10000, hand: [], currentBet: 0, hasStayed: false };
-    }));
-    const dealerIdx = Math.floor(Math.random() * players.length);
-    const houseId = players[dealerIdx].id;
-    roomGames[roomName] = {
-        roomName, players, houseId, firstHouseId: houseId, fee: room.fee,
-        pot: room.fee, currentRound: 1, phase: 'BETTING', 
-        bettingTimer: 15, decisionTimer: 15, activePlayerIndex: 0, deck: createDeck(),
-        message: `ပွဲစဉ် ၁- ${players[dealerIdx].name} သည် ဒိုင်ဖြစ်သည်!`
-    };
-    const dealerAcc = await pool.query('UPDATE accounts SET balance = balance - $1 WHERE username = $2 RETURNING *', [room.fee, houseId]);
-    if (dealerAcc.rows[0]) players.find(p => p.id === houseId).balance = dealerAcc.rows[0].balance;
-    players.forEach(p => {
-        if (p.id.startsWith('AI-')) {
-            p.currentBet = room.fee - Math.floor(room.fee * 0.01);
-            p.balance -= room.fee; p.isReady = true;
-        } else p.isReady = false;
-    });
-    res.json(getMaskedGame(roomGames[roomName], houseId));
+    try {
+        const players = await Promise.all(room.players.map(async (p) => {
+            const acc = await pool.query('SELECT * FROM accounts WHERE username = $1', [p.id]);
+            return { ...p, balance: acc.rows[0] ? acc.rows[0].balance : 10000, hand: [], currentBet: 0, hasStayed: false };
+        }));
+        const dealerIdx = Math.floor(Math.random() * players.length);
+        const houseId = players[dealerIdx].id;
+        roomGames[roomName] = {
+            roomName, players, houseId, firstHouseId: houseId, fee: room.fee,
+            pot: room.fee, currentRound: 1, phase: 'BETTING', 
+            bettingTimer: 15, decisionTimer: 15, activePlayerIndex: 0, deck: createDeck(),
+            message: `ပွဲစဉ် ၁- ${players[dealerIdx].name} သည် ဒိုင်ဖြစ်သည်!`
+        };
+        const dealerAcc = await pool.query('UPDATE accounts SET balance = balance - $1 WHERE username = $2 RETURNING *', [room.fee, houseId]);
+        if (dealerAcc.rows[0]) players.find(p => p.id === houseId).balance = dealerAcc.rows[0].balance;
+        players.forEach(p => {
+            if (p.id.startsWith('AI-')) {
+                p.currentBet = room.fee - Math.floor(room.fee * 0.01);
+                p.balance -= room.fee; p.isReady = true;
+            } else p.isReady = false;
+        });
+        res.json(getMaskedGame(roomGames[roomName], houseId));
+    } catch (e) { res.status(500).json({message: "Game start failed"}); }
 });
 
 app.get('/api/rooms/:name/game', (req, res) => {
@@ -269,11 +305,14 @@ app.post('/api/rooms/:name/bet', async (req, res) => {
     const roomName = decodeURIComponent(req.params.name);
     const game = roomGames[roomName];
     const { playerId, amount } = req.body;
+    if (!game) return res.status(404).send();
     const p = game.players.find(p => p.id === playerId);
     if (p && !p.isReady && p.id !== game.houseId) {
         p.currentBet = amount - Math.floor(amount * 0.01);
         p.balance -= amount; p.isReady = true;
-        await pool.query('UPDATE accounts SET balance = $1 WHERE username = $2', [p.balance, playerId]);
+        try {
+            await pool.query('UPDATE accounts SET balance = $1 WHERE username = $2', [p.balance, playerId]);
+        } catch (e) { console.error("Bet update failed", e.message); }
         if (game.players.filter(pl => pl.id !== game.houseId).every(pl => pl.isReady)) {
             game.phase = 'DEALING';
             game.message = 'လောင်းကြေးများတင်ပြီးပါပြီ! ကတ်များဝေနေသည်...';
@@ -297,6 +336,7 @@ app.post('/api/rooms/:name/decision', (req, res) => {
     const roomName = decodeURIComponent(req.params.name);
     const game = roomGames[roomName];
     const { playerId, decision } = req.body;
+    if (!game) return res.status(404).send();
     const p = game.players[game.activePlayerIndex];
     if (p && p.id === playerId) {
         if (decision === 'draw' && p.hand.length < 3) p.hand.push(game.deck.pop());
@@ -330,7 +370,9 @@ setInterval(() => {
                     if (p.id !== game.houseId && !p.isReady) {
                         p.currentBet = game.fee - Math.floor(game.fee * 0.01);
                         p.balance -= game.fee; p.isReady = true;
-                        await pool.query('UPDATE accounts SET balance = $1 WHERE username = $2', [p.balance, p.id]);
+                        try {
+                            await pool.query('UPDATE accounts SET balance = $1 WHERE username = $2', [p.balance, p.id]);
+                        } catch (e) { console.error("Auto bet balance update failed", e.message); }
                     }
                 }
                 game.phase = 'DEALING'; game.message = 'အချိန်စေ့သွားပါပြီ! ကတ်များဝေနေသည်...';
