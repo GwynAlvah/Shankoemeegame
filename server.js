@@ -11,9 +11,6 @@ const PORT = process.env.PORT || 3001;
 
 // --- Database Connection ---
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/shankoe-mee';
-mongoose.connect(MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
 
 // --- Schemas & Models ---
 const accountSchema = new mongoose.Schema({
@@ -26,21 +23,36 @@ const Account = mongoose.model('Account', accountSchema);
 
 // Seed default accounts if empty
 const seedAccounts = async () => {
-    const count = await Account.countDocuments();
-    if (count === 0) {
-        await Account.create([
-            { username: 'admin', password: 'admin123', balance: 0, role: 'admin' },
-            { username: 'Dragon', password: 'password123', balance: 50000, role: 'user' },
-            { username: 'Lucky', password: 'password123', balance: 15000, role: 'user' },
-        ]);
-        console.log('Seeded default accounts');
+    try {
+        const count = await Account.countDocuments();
+        if (count === 0) {
+            await Account.create([
+                { username: 'admin', password: 'admin123', balance: 0, role: 'admin' },
+                { username: 'Dragon', password: 'password123', balance: 50000, role: 'user' },
+                { username: 'Lucky', password: 'password123', balance: 15000, role: 'user' },
+            ]);
+            console.log('Seeded default accounts');
+        }
+    } catch (e) {
+        console.error("Seeding failed", e);
     }
 };
-seedAccounts();
+
+mongoose.connect(MONGODB_URI)
+  .then(async () => {
+    console.log('Connected to MongoDB');
+    await seedAccounts();
+  })
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    // On Render, we want to see the error, but maybe not crash immediately 
+    // if it's a transient network issue. However, status 1 helps Render logs.
+    setTimeout(() => process.exit(1), 5000); 
+  });
 
 // --- Middleware ---
 app.use(cors({
-    origin: '*', // For development, allow all. For production, specify your frontend URL on Render settings.
+    origin: '*', 
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type']
 }));
